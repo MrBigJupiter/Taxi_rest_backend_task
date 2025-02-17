@@ -1,0 +1,8 @@
+Columns inside the database:
+- id (unique id for the vehicle)(primary_key)
+- fuel_type (fuel or hybrid)
+- distance (how much a car can go in one sitting)
+- seats (number of seats available for passangers: INT)
+- license_plate_number(str)
+- car_brand (eg: Mercedes, Audi, Toyota)
+- driver_name (str) 
