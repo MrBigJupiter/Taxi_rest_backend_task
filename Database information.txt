@@ -6,3 +6,29 @@ Columns inside the database:
 - license_plate_number(str)
 - car_brand (eg: Mercedes, Audi, Toyota)
 - driver_name (str) 
+- on_route()bool
+- available_from(datetime)
+
+
+
+Logic behind:
+
+Input parameters are:
+    1. Number of passangers
+    2. Distance to be driven 
+
+Conditions:
+    1. Every vehicle is fully tanked immidiately after every trip
+    2. If a trip is <50km then every kilometer takes 2minutes
+    3. If a trip is > 50km then every kilometer takes 1minutes
+    Hybrid car conditions:
+        4. For hybrid cars inside city (under 50km) radius their distance is shortened 1km after every 2km traveled
+
+Profit calculating:
+    Profit:
+        1. Every km is 2EUR and every half hour started is also 2EUR (even if by one minutes)
+    Costs
+        2.Every km traveled is 2EUR in cost and only 1EUR for Electric (Hybrid) 
+
+Output:
+    List all combinations of available vehicles and their assumed profit
