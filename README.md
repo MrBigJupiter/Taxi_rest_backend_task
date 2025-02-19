@@ -159,5 +159,3 @@ db.init_app(app)
 - **Production**: For deployment, use a WSGI server like `gunicorn` and consider a robust DB (e.g., PostgreSQL).
 
 ---
-
-That’s the core documentation in Markdown form, highlighting the API’s usage, endpoint behaviors, and data model—**without** the full source code. Feel free to expand or modify as your project evolves!
