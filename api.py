@@ -1,9 +1,10 @@
 from flask import Flask, request, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import Date
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from sqlalchemy.orm import Mapped, mapped_column
 from flask_restful import reqparse, Resource, marshal_with, fields, Api
+import pytz
 
 app = Flask(__name__)
 
@@ -14,14 +15,15 @@ api = Api(app=app)
 
 class Vehicle(db.Model):
     id: Mapped[int] = mapped_column(primary_key=True)
-    fuel_type: Mapped[str] = mapped_column(nullable=False) # Either fuel or hybrid
-    distance: Mapped[int] = mapped_column(nullable=False) # distance in km for how far a car can go
-    seats: Mapped[int] = mapped_column(nullable=False) # number of seats available for passangers
+    fuel_type: Mapped[str] = mapped_column(nullable=False) 
+    range: Mapped[int] = mapped_column(nullable=False)
+    distance: Mapped[int] = mapped_column(nullable=False) 
+    seats: Mapped[int] = mapped_column(nullable=False) 
     license_plate_number: Mapped[str] = mapped_column(nullable=False, unique=True)
     car_brand: Mapped[str] = mapped_column(nullable=False)
     driver_name: Mapped[str] = mapped_column(nullable=False)
     on_route: Mapped[bool] = mapped_column(nullable=False)
-    available_from: Mapped[date] = mapped_column(Date, nullable=False)
+    available_from: Mapped[datetime] = mapped_column(nullable=False)
 
 # Argument parsing
 
@@ -34,7 +36,7 @@ vehicle_args.add_argument('license_plate_number', type=str, help='License plate 
 vehicle_args.add_argument('car_brand', type=str, help='Brand of the car.')
 vehicle_args.add_argument('driver_name', type=str, help='The name of the driver.')
 vehicle_args.add_argument('on_route', type = bool, help= 'Is it occupied for the time being')
-vehicle_args.add_argument('available_from', type =date, help= 'From when the car is available for use' )
+#vehicle_args.add_argument('available_from', type =date, help= 'From when the car is available for use' )
 
 fleet_vehicles = {
     'id': fields.Integer,
@@ -51,6 +53,7 @@ fleet_vehicles = {
 
 # Get all information on the fleet
 class GetAllFleet(Resource):
+
     @marshal_with(fleet_vehicles)
     def get(self):
         whole_fleet = Vehicle.query.all()
@@ -58,33 +61,39 @@ class GetAllFleet(Resource):
     
     @marshal_with(fleet_vehicles)
     def post(self):
+        """Add a new vehicle to the fleet."""
         args = vehicle_args.parse_args()
+        eet = pytz.timezone("Europe/Bucharest")
+        available_from = datetime.now(tz=eet)
 
-        try:
-            available_from = datetime.strptime(args['available_from'], '%Y-%m-%d %H:%M:%S') if args['available_from'] else datetime.utcnow()
-        except ValueError:
-            return {"message": "Invalid datetime format for available_from. Use YYYY-MM-DD HH:MM:SS."}, 400
+        new_vehicle = Vehicle(
+            fuel_type=args['fuel_type'],
+            range=args['range'],
+            distance=args['distance'],
+            seats=args['seats'],
+            license_plate_number=args['license_plate_number'],
+            car_brand=args['car_brand'],
+            driver_name=args['driver_name'],
+            on_route=args['on_route'],
+            available_from=available_from
+        )
         
-        new_entry = Vehicle(fuel_type = args['fuel_type'], 
-                            range = args['range'],
-                            distance = args['distance'], 
-                            seats = args['seats'], 
-                            license_plate_number = args['license_plate_number'],
-                            car_brand = args['car_brand'],
-                            driver_name = args['driver_name'],
-                            on_route = args['on_route'],
-                            available_from = available_from)
-        
-        db.session.add(new_entry)
+        db.session.add(new_vehicle)
         db.session.commit()
-        fleet = Vehicle.query.all()
-        return fleet, 201
+        return new_vehicle, 201
     
     @marshal_with(fleet_vehicles)
     def put(self):
-        """Update a vehicle's information by license plate."""
+        """Update a vehicle's information by ID or license plate."""
         args = vehicle_args.parse_args()
-        vehicle = Vehicle.query.filter_by(license_plate_number=args['license_plate_number']).first()
+        vehicle = None
+        eet = pytz.timezone("Europe/Bucharest")
+        available_from = datetime.now(tz=eet)
+        
+        if 'id' in args and args['id']:
+            vehicle = Vehicle.query.get(args['id'])
+        elif args['license_plate_number']:
+            vehicle = Vehicle.query.filter_by(license_plate_number=args['license_plate_number']).first()
 
         if not vehicle:
             return {"message": "Vehicle not found."}, 404
@@ -93,23 +102,28 @@ class GetAllFleet(Resource):
             if args[field] is not None:
                 setattr(vehicle, field, args[field])
 
-        if args['available_from']:
-            vehicle.available_from = args['available_from']
+        vehicle.available_from = available_from
 
         db.session.commit()
         return vehicle, 200
 
+    @marshal_with(fleet_vehicles)
     def delete(self):
-        """Delete a vehicle by license plate."""
+        """Delete a vehicle by ID or license plate."""
         args = vehicle_args.parse_args()
-        vehicle = Vehicle.query.filter_by(license_plate_number=args['license_plate_number']).first()
-
+        
+        vehicle = None
+        if 'id' in args and args['id']:
+            vehicle = Vehicle.query.get(args['id'])
+        elif args['license_plate_number']:
+            vehicle = Vehicle.query.filter_by(license_plate_number=args['license_plate_number']).first()
+        
         if not vehicle:
             return {"message": "Vehicle not found."}, 404
 
         db.session.delete(vehicle)
         db.session.commit()
-        return {"message": f"Vehicle with license plate {args['license_plate_number']} has been deleted."}, 200
+        return {"message": f"Vehicle with ID {args.get('id') or args['license_plate_number']} has been deleted."}, 200
 
 api.add_resource(GetAllFleet, '/all/fleet')
 
